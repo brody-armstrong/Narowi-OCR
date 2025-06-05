@@ -14,10 +14,11 @@ class ReadingType(Enum):
 
 @dataclass
 class ValidationResult:
+    """Class to hold temperature validation results."""
     is_valid: bool
     confidence_adjustment: float
-    error_reason: Optional[str] = None
-    suggested_correction: Optional[str] = None
+    error_reason: Optional[str]
+    suggested_correction: Optional[str]
 
 @dataclass
 class MedicalReading:
@@ -28,7 +29,7 @@ class MedicalReading:
     confidence: float
     raw_text: str
     is_valid: bool = True
-    validation_details: Optional[ValidationResult] = None
+    validation_details: Optional[str] = None
 
 class PatternMatcher:
     """Identifies and categorizes medical readings from text."""
@@ -37,17 +38,21 @@ class PatternMatcher:
         # Blood pressure (must come first)
         (ReadingType.BLOOD_PRESSURE, re.compile(r'(?:^|\s)(?:BP:)?\s*(\d{2,3})[/-](\d{2,3})(?:\s|$)', re.IGNORECASE), 'mmHg'),
         (ReadingType.BLOOD_PRESSURE, re.compile(r'(?:^|\s)SYS:\s*(\d{2,3})\s*DIA:\s*(\d{2,3})(?:\s|$)', re.IGNORECASE), 'mmHg'),
+
         # Temperature
         (ReadingType.TEMPERATURE, re.compile(r'(?:^|\s)(?:TEMP:)?\s*(\d{2,3}(?:\.\d{1,2})?)\s*[°]?[Ff](?=\b|\s|$)', re.IGNORECASE), '°F'),
         (ReadingType.TEMPERATURE, re.compile(r'(?:^|\s)(?:TEMP:)?\s*(\d{2,3}(?:\.\d{1,2})?)\s*[°]?[Cc](?=\b|\s|$)', re.IGNORECASE), '°C'),
-        # Weight (allow no space between number and unit, and allow start or whitespace)
-        (ReadingType.WEIGHT, re.compile(r'(?:^|\s)(?:WT:)?\s*(\d{2,3}(?:\.\d{1,2})?)\s*(lbs?|lb)(?=\b|\s|$)', re.IGNORECASE), 'lbs'),
-        (ReadingType.WEIGHT, re.compile(r'(?:^|\s)(?:WT:)?\s*(\d{2,3}(?:\.\d{1,2})?)\s*(kg|kgs)(?=\b|\s|$)', re.IGNORECASE), 'kg'),
-        (ReadingType.WEIGHT, re.compile(r'(?:^|\s)(?:WT:)?\s*(\d{2,3}(?:\.\d{1,2})?)(lbs?|lb)(?=\b|\s|$)', re.IGNORECASE), 'lbs'),
-        (ReadingType.WEIGHT, re.compile(r'(?:^|\s)(?:WT:)?\s*(\d{2,3}(?:\.\d{1,2})?)(kg|kgs)(?=\b|\s|$)', re.IGNORECASE), 'kg'),
-        # Oxygen (must come before heart rate to avoid conflicts)
+
+        # Weight
+        (ReadingType.WEIGHT, re.compile(r'(?:^|\s)(?:WT:)?\s*(\d{1,4}(?:\.\d{1,2})?)\s*(?:lb|lbs|b|Ib|Ibs)\b', re.IGNORECASE), 'lbs'),
+        (ReadingType.WEIGHT, re.compile(r'(?:^|\s)(?:WT:)?\s*(\d{1,4}(?:\.\d{1,2})?)\s*(?:kg|kgs|k)\b', re.IGNORECASE), 'kg'),
+        (ReadingType.WEIGHT, re.compile(r'(?:^|\s)(?:WT:)?\s*(\d{1,4}(?:\.\d{1,2})?)(?:lb|lbs|b|Ib|Ibs)\b', re.IGNORECASE), 'lbs'),
+        (ReadingType.WEIGHT, re.compile(r'(?:^|\s)(?:WT:)?\s*(\d{1,4}(?:\.\d{1,2})?)(?:kg|kgs|k)\b', re.IGNORECASE), 'kg'),
+
+        # Oxygen
         (ReadingType.OXYGEN, re.compile(r'(?:^|\s)(?:SPO2:|O2:)?\s*(\d{2,3})\s*%(?:\s|$)', re.IGNORECASE), '%'),
         (ReadingType.OXYGEN, re.compile(r'(?:^|\s)(?:SPO2:|O2:)\s*(\d{2,3})(?:\s|$)', re.IGNORECASE), '%'),
+
         # Heart rate
         (ReadingType.HEART_RATE, re.compile(r'(?:^|\s)(?:HR:|PULSE:)?\s*(\d{2,3})\s*(?:BPM|HR)?(?:\s|$)', re.IGNORECASE), 'BPM'),
     ]
@@ -73,12 +78,9 @@ class PatternMatcher:
         }
     }
 
-    # Constants for validation
+    # Minimum confidence thresholds
     TEMP_MIN_CONFIDENCE = 85.0
-    TEMP_MIN_F = 95.0
-    TEMP_MAX_F = 105.0
-    TEMP_MIN_C = 35.0
-    TEMP_MAX_C = 40.5
+    WEIGHT_MIN_CONFIDENCE = 85.0
 
     def __init__(self):
         # For backward compatibility with tests
@@ -87,69 +89,18 @@ class PatternMatcher:
             for reading_type in ReadingType if reading_type != ReadingType.UNKNOWN
         }
 
-    def validate_temperature_format(self, text: str) -> ValidationResult:
-        """Validate temperature format and return validation result."""
-        # Check for invalid characters
-        if '/' in text or '\\' in text:
-            return ValidationResult(
-                is_valid=False,
-                confidence_adjustment=-20.0,
-                error_reason="Invalid character '/' or '\\' in temperature",
-                suggested_correction=text.replace('/', '.').replace('\\', '.')
-            )
-
-        # Check for trailing decimal
-        if text.endswith('.'):
-            return ValidationResult(
-                is_valid=False,
-                confidence_adjustment=-15.0,
-                error_reason="Temperature ends with decimal point",
-                suggested_correction=text[:-1]
-            )
-
-        # Check for valid format
-        if not re.match(r'^\d+\.?\d*[°]?[FC]$', text):
-            return ValidationResult(
-                is_valid=False,
-                confidence_adjustment=-30.0,
-                error_reason="Invalid temperature format",
-                suggested_correction=None
-            )
-
-        # Check for missing unit
-        if not text.endswith(('F', 'C', '°F', '°C')):
-            return ValidationResult(
-                is_valid=False,
-                confidence_adjustment=-25.0,
-                error_reason="Missing temperature unit (F or C)",
-                suggested_correction=f"{text}°F"
-            )
-
-        return ValidationResult(is_valid=True, confidence_adjustment=0.0)
-
     def find_readings(self, text: str, confidence: float) -> List[MedicalReading]:
         if text is None:
             return []
         readings = []
         used_ranges = []  # list of (start, end) tuples
+        
+        # Process each pattern
         for reading_type, pattern, unit in self.PATTERNS:
-            # Debug: print pattern and text for WEIGHT
-            if reading_type == ReadingType.WEIGHT:
-                print(f"Trying pattern: {pattern.pattern} on text: '{text}'")
             for match in pattern.finditer(text):
-                if reading_type == ReadingType.WEIGHT:
-                    print(f"  Match found: {match.group(0)}")
-                    print(f"    start: {match.start()}, end: {match.end()}, ws_prefix: {len(match.group(0)) - len(match.group(0).lstrip())}, ws_suffix: {len(match.group(0)) - len(match.group(0).rstrip())}")
-                    print(f"    value_start: {match.start() + (len(match.group(0)) - len(match.group(0).lstrip()))}, value_end: {match.end() - (len(match.group(0)) - len(match.group(0).rstrip()))}, used_ranges: {used_ranges}")
                 start, end = match.span()
-                match_text = match.group(0)
-                # Calculate the span of the match after stripping leading/trailing whitespace
-                ws_prefix = len(match_text) - len(match_text.lstrip())
-                ws_suffix = len(match_text) - len(match_text.rstrip())
-                value_start = start + ws_prefix
-                value_end = end - ws_suffix
-                # Skip if this overlaps with any already-used range (using value span)
-                if any(not (value_end <= s or value_start >= e) for s, e in used_ranges):
+                # Skip if this match is completely contained within a previous match
+                if any(s <= start and end <= e for s, e in used_ranges):
                     continue
                 if reading_type == ReadingType.BLOOD_PRESSURE:
                     systolic = float(match.group(1))
@@ -170,34 +121,35 @@ class PatternMatcher:
                         raw_text=match.group(0).strip(),
                         is_valid=self._validate_reading(reading_type, diastolic, unit, 'diastolic')
                     ))
-                elif reading_type == ReadingType.WEIGHT:
-                    value = float(match.group(1))
-                    unit_str = match.group(2).lower()
-                    if 'kg' in unit_str:
-                        unit_final = 'kg'
-                    else:
-                        unit_final = 'lbs'
-                    is_valid = self._validate_reading(reading_type, value, unit_final)
-                    readings.append(MedicalReading(
-                        type=reading_type,
-                        value=value,
-                        unit=unit_final,
-                        confidence=confidence,
-                        raw_text=match.group(0).strip(),
-                        is_valid=is_valid
-                    ))
-                else:
-                    value = float(match.group(1))
-                    is_valid = self._validate_reading(reading_type, value, unit)
+                elif reading_type == ReadingType.OXYGEN and len(match.groups()) == 2:
+                    value = float(match.group(2))
                     readings.append(MedicalReading(
                         type=reading_type,
                         value=value,
                         unit=unit,
                         confidence=confidence,
                         raw_text=match.group(0).strip(),
-                        is_valid=is_valid
+                        is_valid=self._validate_reading(reading_type, value, unit)
                     ))
-                used_ranges.append((value_start, value_end))
+                else:
+                    value = float(match.group(1))
+                    is_valid = self._validate_reading(reading_type, value, unit)
+                    validation_details = None
+                    if reading_type == ReadingType.TEMPERATURE:
+                        validation = self.validate_temperature_format(match.group(0).strip())
+                        is_valid = validation.is_valid
+                        validation_details = validation.error_reason
+                    readings.append(MedicalReading(
+                        type=reading_type,
+                        value=value,
+                        unit=unit,
+                        confidence=confidence,
+                        raw_text=match.group(0).strip(),
+                        is_valid=is_valid,
+                        validation_details=validation_details
+                    ))
+                used_ranges.append((start, end))
+        print(f"Returning {len(readings)} readings: {readings}")
         return readings
 
     def _validate_reading(self, 
@@ -212,6 +164,7 @@ class PatternMatcher:
             min_val, max_val = ranges[bp_type]
         else:
             min_val, max_val = ranges[unit]
+        print(f"Validating {reading_type} with value {value} {unit} against range {min_val}-{max_val}")
         return min_val <= value <= max_val
 
     def convert_unit(self, reading: MedicalReading, target_unit: str) -> Optional[MedicalReading]:
@@ -258,3 +211,99 @@ class PatternMatcher:
                     is_valid=reading.is_valid
                 )
         return None 
+
+    def extract_weight(self, text: str, confidence: float) -> List[MedicalReading]:
+        """
+        Extract weight readings from text.
+        """
+        if confidence < self.WEIGHT_MIN_CONFIDENCE:
+            return []
+        readings = []
+        seen_raw_texts = set()  # Track raw texts to avoid duplicates
+        for reading_type, pattern, unit in self.PATTERNS:
+            if reading_type != ReadingType.WEIGHT:
+                continue
+            for match in pattern.finditer(text):
+                raw_text = match.group(0).strip()
+                if raw_text in seen_raw_texts:
+                    continue
+                seen_raw_texts.add(raw_text)
+                value = float(match.group(1))
+                is_valid = self._validate_reading(reading_type, value, unit)
+                readings.append(MedicalReading(
+                    type=reading_type,
+                    value=value,
+                    unit=unit,
+                    confidence=confidence,
+                    raw_text=raw_text,
+                    is_valid=is_valid,
+                    validation_details=None if is_valid else f"Weight value {value} {unit} is out of valid range"
+                ))
+        return readings
+
+    def validate_temperature_format(self, text: str) -> ValidationResult:
+        """
+        Validate temperature format and suggest corrections.
+        """
+        import re
+        # Check for invalid characters
+        if '/' in text or '\\' in text:
+            return ValidationResult(
+                is_valid=False,
+                confidence_adjustment=-20.0,
+                error_reason="Invalid character '/' or '\\' in temperature",
+                suggested_correction=text.replace('/', '.').replace('\\', '.')
+            )
+        # Check for trailing decimal
+        if text.strip().endswith('.'):
+            return ValidationResult(
+                is_valid=False,
+                confidence_adjustment=-15.0,
+                error_reason="Temperature ends with decimal point",
+                suggested_correction=text.rstrip('.')
+            )
+        # Use regex to extract value and unit
+        match = re.search(r'([\d.]+)\s*[°]?[FfCc]', text)
+        if not match:
+            return ValidationResult(
+                is_valid=False,
+                confidence_adjustment=-30.0,
+                error_reason="Invalid temperature format",
+                suggested_correction=None
+            )
+        try:
+            value = float(match.group(1))
+            unit = None
+            if 'F' in text.upper():
+                unit = '°F'
+            elif 'C' in text.upper():
+                unit = '°C'
+            if unit == '°F':
+                if not (95 <= value <= 105):
+                    return ValidationResult(
+                        is_valid=False,
+                        confidence_adjustment=-30.0,
+                        error_reason="Temperature value out of reasonable range",
+                        suggested_correction=None
+                    )
+            elif unit == '°C':
+                if not (35 <= value <= 41):
+                    return ValidationResult(
+                        is_valid=False,
+                        confidence_adjustment=-30.0,
+                        error_reason="Temperature value out of reasonable range",
+                        suggested_correction=None
+                    )
+            return ValidationResult(
+                is_valid=True,
+                confidence_adjustment=0.0,
+                error_reason=None,
+                suggested_correction=None
+            )
+        except ValueError:
+            return ValidationResult(
+                is_valid=False,
+                confidence_adjustment=-30.0,
+                error_reason="Invalid temperature format",
+                suggested_correction=None
+            ) 

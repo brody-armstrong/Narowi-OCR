@@ -6,19 +6,30 @@ import numpy as np
 class OCREngine:
     """Wrapper for Tesseract OCR functionality."""
     
-    def __init__(self, config: Optional[Dict] = None):
+    def __init__(self, config: Optional[Dict] = None, device_type: Optional[str] = None):
         """
         Initialize OCR engine with optional configuration.
         
         Args:
             config: Dictionary of Tesseract configuration parameters
+            device_type: Optional string for device type (unused, for compatibility)
         """
         self.config = config or {
             '--oem': '1',  # Use Legacy + LSTM OCR Engine Mode
-            '--psm': '6',  # Assume uniform block of text
-            'tessedit_char_whitelist': '0123456789./-',  # Only look for numbers and basic symbols
+            '--psm': '3',  # Fully automatic page segmentation, but no OSD
+            'tessedit_char_whitelist': '0123456789./-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',  # Allow letters and numbers
         }
+        # device_type is accepted for compatibility but not used
         
+    def set_psm(self, psm_mode: str) -> None:
+        """
+        Set the PSM (Page Segmentation Mode) for Tesseract OCR.
+        
+        Args:
+            psm_mode: PSM mode as a string (e.g., '3', '6', '7', '8', '13')
+        """
+        self.config['--psm'] = psm_mode
+
     def extract_text(self, image: np.ndarray) -> str:
         """
         Extract text from preprocessed image.
