@@ -1,0 +1,13 @@
+README.md
+setup.py
+src/medical_ocr.egg-info/PKG-INFO
+src/medical_ocr.egg-info/SOURCES.txt
+src/medical_ocr.egg-info/dependency_links.txt
+src/medical_ocr.egg-info/requires.txt
+src/medical_ocr.egg-info/top_level.txt
+tests/test_ocr_extraction.py
+tests/test_ocr_real_world.py
+tests/test_pattern_matcher.py
+tests/test_phase1.py
+tests/test_roi_detector.py
+tests/test_thermometer.py

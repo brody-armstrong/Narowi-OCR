@@ -1,0 +1,7 @@
+Metadata-Version: 2.1
+Name: medical_ocr
+Version: 0.1.0
+Requires-Python: >=3.8
+Requires-Dist: numpy
+Requires-Dist: opencv-python
+Requires-Dist: pytesseract
