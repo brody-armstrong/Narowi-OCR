@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from PIL import Image
+import cv2
 from typing import Tuple, Optional
 
 class ImageProcessor:
@@ -89,19 +90,97 @@ class ImageProcessor:
         Returns:
             numpy.ndarray: Preprocessed image
         """
-        # Convert to grayscale
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # Apply Gaussian blur to reduce noise
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        # Convert to grayscale if the image is color
+        if len(image.shape) == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image # Assume it's already grayscale
+
+        # Apply CLAHE
+        clahe_gray = ImageProcessor.apply_clahe(gray)
+
+        # Apply Bilateral Filter
+        bilateral_filtered_gray = ImageProcessor.apply_bilateral_filter(clahe_gray)
+
+        # Apply unsharp masking
+        sharpened_gray = ImageProcessor.apply_unsharp_masking(bilateral_filtered_gray)
+
+        # Apply Gaussian blur after sharpening
+        blurred_after_sharpen = cv2.GaussianBlur(sharpened_gray, (5, 5), 0)
         
         # Apply adaptive thresholding
         thresh = cv2.adaptiveThreshold(
-            blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+            blurred_after_sharpen, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY, 11, 2
         )
         
-        return thresh
+        # Apply morphological operations
+        final_output = ImageProcessor.apply_morph_operations(thresh)
+        return final_output
+
+    @staticmethod
+    def apply_clahe(gray_image: np.ndarray) -> np.ndarray:
+        """
+        Applies Contrast Limited Adaptive Histogram Equalization (CLAHE) to a grayscale image.
+
+        Args:
+            gray_image: Input grayscale image.
+
+        Returns:
+            Image after CLAHE application.
+        """
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        clahe_image = clahe.apply(gray_image)
+        return clahe_image
+
+    @staticmethod
+    def apply_bilateral_filter(gray_image: np.ndarray) -> np.ndarray:
+        """
+        Applies Bilateral Filtering to a grayscale image.
+        This can reduce noise while keeping edges sharp.
+
+        Args:
+            gray_image: Input grayscale image.
+
+        Returns:
+            Image after Bilateral Filtering.
+        """
+        # d: Diameter of each pixel neighborhood.
+        # sigmaColor: Filter sigma in the color space.
+        # sigmaSpace: Filter sigma in the coordinate space.
+        filtered_image = cv2.bilateralFilter(gray_image, d=9, sigmaColor=75, sigmaSpace=75)
+        return filtered_image
+
+    @staticmethod
+    def apply_unsharp_masking(gray_image: np.ndarray) -> np.ndarray:
+        """
+        Applies unsharp masking to a grayscale image.
+
+        Args:
+            gray_image: Input grayscale image.
+
+        Returns:
+            Sharpened grayscale image.
+        """
+        blurred = cv2.GaussianBlur(gray_image, (0,0), sigmaX=3, sigmaY=3)
+        sharpened = cv2.addWeighted(gray_image, 1.5, blurred, -0.5, 0)
+        return sharpened
+
+    @staticmethod
+    def apply_morph_operations(image: np.ndarray) -> np.ndarray:
+        """
+        Applies morphological opening and closing to the image.
+
+        Args:
+            image: Input image (should be binary).
+
+        Returns:
+            Image after morphological operations.
+        """
+        kernel = np.ones((3,3), np.uint8)
+        opened = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel, iterations=1)
+        closed = cv2.morphologyEx(opened, cv2.MORPH_CLOSE, kernel, iterations=1)
+        return closed
 
     @staticmethod
     def save_image(image: np.ndarray, output_path: str) -> bool:
