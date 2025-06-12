@@ -82,14 +82,50 @@ class ImageProcessor:
     @staticmethod
     def preprocess_for_ocr(image: np.ndarray) -> np.ndarray:
         """
-        Apply basic preprocessing pipeline for OCR.
+        Preprocess image for better OCR results.
         
         Args:
-            image: Input image
+            image: Input image as numpy array
             
         Returns:
-            numpy.ndarray: Preprocessed image
+            Preprocessed image as numpy array
         """
+        feature/pattern-matcher-enhancements
+        # Convert to grayscale
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Apply CLAHE for better contrast
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        clahe_gray = clahe.apply(gray)
+        
+        # Apply bilateral filter to remove noise while preserving edges
+        filtered = cv2.bilateralFilter(clahe_gray, 9, 75, 75)
+        
+        # Apply unsharp masking to enhance edges
+        gaussian = cv2.GaussianBlur(filtered, (0, 0), 3.0)
+        unsharp_mask = cv2.addWeighted(filtered, 1.5, gaussian, -0.5, 0)
+        
+        # Apply adaptive thresholding
+        thresh = cv2.adaptiveThreshold(
+            unsharp_mask,
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY,
+            11,
+            2
+        )
+        
+        # Apply morphological operations to clean up the image
+        kernel = np.ones((2, 2), np.uint8)
+        cleaned = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+        
+        # Increase contrast and brightness
+        alpha = 1.8  # Contrast control
+        beta = 15    # Brightness control
+        enhanced = cv2.convertScaleAbs(cleaned, alpha=alpha, beta=beta)
+        
+        return enhanced
+=======
         # Convert to grayscale if the image is color
         if len(image.shape) == 3:
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -117,6 +153,7 @@ class ImageProcessor:
         # Apply morphological operations
         final_output = ImageProcessor.apply_morph_operations(thresh)
         return final_output
+      main
 
     @staticmethod
     def apply_clahe(gray_image: np.ndarray) -> np.ndarray:

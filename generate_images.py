@@ -18,4 +18,8 @@ images_to_generate = {
 
 for text, path in images_to_generate.items():
     generate_synthetic_image(text, path)
+feature/pattern-matcher-enhancements
     print(f"Generated {path}")
+
+    print(f"Generated {path}"
+          main

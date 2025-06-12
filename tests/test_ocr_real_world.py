@@ -74,6 +74,10 @@ def test_ocr_real_world():
     processor = ImageProcessor()
     engine = OCREngine()
     
+    # Create debug directory if it doesn't exist
+    debug_dir = os.path.join(os.path.dirname(__file__), 'debug_output')
+    os.makedirs(debug_dir, exist_ok=True)
+    
     # TODO: Add real-world test images
     # For now, we'll use the synthetic images to test the enhanced preprocessing
     image_paths = [
@@ -91,14 +95,20 @@ def test_ocr_real_world():
         # Apply enhanced preprocessing
         preprocessed = preprocess_image(image)
         
+        # Save preprocessed image for debugging
+        debug_path = os.path.join(debug_dir, f"preprocessed_{os.path.basename(image_path)}")
+        cv2.imwrite(debug_path, preprocessed)
+        print(f"Saved preprocessed image to: {debug_path}")
+        
         # Try different PSM modes for better accuracy
-        psm_modes = ['7', '8', '13']  # Single line, single word, raw line
+        psm_modes = ['3', '4', '6', '7', '8', '13']  # Added more PSM modes
         best_text = ""
         best_confidence = 0.0
         
         for psm in psm_modes:
             engine.set_psm(psm)
             text, confidence = engine.extract_with_confidence(preprocessed)
+            print(f"PSM {psm}: Text='{text}', Confidence={confidence:.2f}%")
             
             if confidence > best_confidence:
                 best_text = text

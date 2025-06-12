@@ -16,7 +16,7 @@ class OCREngine:
         """
         self.config = config or {
             '--oem': '1',  # Use Legacy + LSTM OCR Engine Mode
-            '--psm': '3',  # Fully automatic page segmentation, but no OSD
+            '--psm': '7',  # Treat the image as a single text line
             'tessedit_char_whitelist': '0123456789./-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',  # Allow letters and numbers
         }
         # device_type is accepted for compatibility but not used
@@ -138,4 +138,7 @@ class OCREngine:
             return char_list
         except Exception as e:
             print(f"Error during detailed OCR data extraction: {e}")
+            feature/pattern-matcher-enhancements
             return []
+            return []
+          main
