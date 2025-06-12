@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from PIL import Image
+import cv2
 from typing import Tuple, Optional
 
 class ImageProcessor:
@@ -81,27 +82,112 @@ class ImageProcessor:
     @staticmethod
     def preprocess_for_ocr(image: np.ndarray) -> np.ndarray:
         """
-        Apply basic preprocessing pipeline for OCR.
+        Preprocess image for better OCR results.
         
         Args:
-            image: Input image
+            image: Input image as numpy array
             
         Returns:
-            numpy.ndarray: Preprocessed image
+            Preprocessed image as numpy array
         """
         # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
-        # Apply Gaussian blur to reduce noise
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        # Apply CLAHE for better contrast
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        clahe_gray = clahe.apply(gray)
+        
+        # Apply bilateral filter to remove noise while preserving edges
+        filtered = cv2.bilateralFilter(clahe_gray, 9, 75, 75)
+        
+        # Apply unsharp masking to enhance edges
+        gaussian = cv2.GaussianBlur(filtered, (0, 0), 3.0)
+        unsharp_mask = cv2.addWeighted(filtered, 1.5, gaussian, -0.5, 0)
         
         # Apply adaptive thresholding
         thresh = cv2.adaptiveThreshold(
-            blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-            cv2.THRESH_BINARY, 11, 2
+            unsharp_mask,
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY,
+            11,
+            2
         )
         
-        return thresh
+        # Apply morphological operations to clean up the image
+        kernel = np.ones((2, 2), np.uint8)
+        cleaned = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+        
+        # Increase contrast and brightness
+        alpha = 1.8  # Contrast control
+        beta = 15    # Brightness control
+        enhanced = cv2.convertScaleAbs(cleaned, alpha=alpha, beta=beta)
+        
+        return enhanced
+
+    @staticmethod
+    def apply_clahe(gray_image: np.ndarray) -> np.ndarray:
+        """
+        Applies Contrast Limited Adaptive Histogram Equalization (CLAHE) to a grayscale image.
+
+        Args:
+            gray_image: Input grayscale image.
+
+        Returns:
+            Image after CLAHE application.
+        """
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        clahe_image = clahe.apply(gray_image)
+        return clahe_image
+
+    @staticmethod
+    def apply_bilateral_filter(gray_image: np.ndarray) -> np.ndarray:
+        """
+        Applies Bilateral Filtering to a grayscale image.
+        This can reduce noise while keeping edges sharp.
+
+        Args:
+            gray_image: Input grayscale image.
+
+        Returns:
+            Image after Bilateral Filtering.
+        """
+        # d: Diameter of each pixel neighborhood.
+        # sigmaColor: Filter sigma in the color space.
+        # sigmaSpace: Filter sigma in the coordinate space.
+        filtered_image = cv2.bilateralFilter(gray_image, d=9, sigmaColor=75, sigmaSpace=75)
+        return filtered_image
+
+    @staticmethod
+    def apply_unsharp_masking(gray_image: np.ndarray) -> np.ndarray:
+        """
+        Applies unsharp masking to a grayscale image.
+
+        Args:
+            gray_image: Input grayscale image.
+
+        Returns:
+            Sharpened grayscale image.
+        """
+        blurred = cv2.GaussianBlur(gray_image, (0,0), sigmaX=3, sigmaY=3)
+        sharpened = cv2.addWeighted(gray_image, 1.5, blurred, -0.5, 0)
+        return sharpened
+
+    @staticmethod
+    def apply_morph_operations(image: np.ndarray) -> np.ndarray:
+        """
+        Applies morphological opening and closing to the image.
+
+        Args:
+            image: Input image (should be binary).
+
+        Returns:
+            Image after morphological operations.
+        """
+        kernel = np.ones((3,3), np.uint8)
+        opened = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel, iterations=1)
+        closed = cv2.morphologyEx(opened, cv2.MORPH_CLOSE, kernel, iterations=1)
+        return closed
 
     @staticmethod
     def save_image(image: np.ndarray, output_path: str) -> bool:

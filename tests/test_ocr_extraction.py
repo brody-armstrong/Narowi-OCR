@@ -5,8 +5,10 @@ from src.processing.ocr_engine import OCREngine
 
 def test_ocr_extraction():
     """Test OCR extraction from a medical device image."""
-    # Path to the test image
-    image_path = '/Users/brody/Downloads/Narowi/medical_ocr/tests/thermometer.png'  # Replace with the actual path to your test image
+    # Get the directory where this test file is located
+    test_dir = os.path.dirname(os.path.abspath(__file__))
+    # Construct the path to the test image relative to the test file
+    image_path = os.path.join(test_dir, 'thermometer_synth_1.png')
 
     # Check if the image file exists
     assert os.path.exists(image_path), f"Test image not found at {image_path}"
