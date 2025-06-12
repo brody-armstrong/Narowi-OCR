@@ -138,5 +138,7 @@ class OCREngine:
             return char_list
         except Exception as e:
             print(f"Error during detailed OCR data extraction: {e}")
+            feature/pattern-matcher-enhancements
             return []
-        
+            return []
+          main

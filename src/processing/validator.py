@@ -22,7 +22,10 @@ class Validator:
 
             # 1. Low confidence digit check
             for char_idx, char_in_word in enumerate(word_text):
+              feature/pattern-matcher-enhancements
                 if (char_in_word == '3' or char_in_word == '5') and word_conf <= cls.LOW_CONFIDENCE_THRESHOLD_3_5:
+                if (char_in_word == '3' or char_in_word == '5') and word_conf < cls.LOW_CONFIDENCE_THRESHOLD_3_5:
+        main
                     issue = ValidationIssue(
                         original_char=char_in_word,
                         char_index_in_word=char_idx,
@@ -52,4 +55,7 @@ class Validator:
                     # Word is not a number, ignore for range check
                     pass
 
+                  feature/pattern-matcher-enhancements
         return original_text, issues
+        return original_text, issues
+      main

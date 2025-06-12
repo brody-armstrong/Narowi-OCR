@@ -10,6 +10,9 @@ from src.processing.validator import Validator, ValidationIssue
 def generate_synthetic_image(text: str, output_path: str, width: int = 100, height: int = 50):
     """
     Generates a synthetic image with the given text.
+
+feature/pattern-matcher-enhancements
+main
     Args:
         text: The text to draw on the image.
         output_path: Path to save the generated PNG image.
@@ -209,4 +212,7 @@ def test_medical_range_validation():
     text_temp_data = [{'text': 'Hot', 'conf': 90.0,  'level': 5, 'page_num': 1, 'block_num': 1, 'par_num': 1, 'line_num': 1, 'word_num': 1, 'left': 0, 'top': 0, 'width': 10, 'height': 10}]
     _, text_issues = validator.validate_digits_with_confidence(text_temp_data, "Hot", context="temperature_fahrenheit")
     text_range_issues = [issue for issue in text_issues if issue.context_type == 'range_check']
+    feature/pattern-matcher-enhancements
     assert len(text_range_issues) == 0
+    assert len(text_range_issues) == 0
+    main

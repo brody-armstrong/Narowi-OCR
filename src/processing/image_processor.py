@@ -90,6 +90,7 @@ class ImageProcessor:
         Returns:
             Preprocessed image as numpy array
         """
+        feature/pattern-matcher-enhancements
         # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
@@ -124,6 +125,35 @@ class ImageProcessor:
         enhanced = cv2.convertScaleAbs(cleaned, alpha=alpha, beta=beta)
         
         return enhanced
+=======
+        # Convert to grayscale if the image is color
+        if len(image.shape) == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image # Assume it's already grayscale
+
+        # Apply CLAHE
+        clahe_gray = ImageProcessor.apply_clahe(gray)
+
+        # Apply Bilateral Filter
+        bilateral_filtered_gray = ImageProcessor.apply_bilateral_filter(clahe_gray)
+
+        # Apply unsharp masking
+        sharpened_gray = ImageProcessor.apply_unsharp_masking(bilateral_filtered_gray)
+
+        # Apply Gaussian blur after sharpening
+        blurred_after_sharpen = cv2.GaussianBlur(sharpened_gray, (5, 5), 0)
+        
+        # Apply adaptive thresholding
+        thresh = cv2.adaptiveThreshold(
+            blurred_after_sharpen, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY, 11, 2
+        )
+        
+        # Apply morphological operations
+        final_output = ImageProcessor.apply_morph_operations(thresh)
+        return final_output
+      main
 
     @staticmethod
     def apply_clahe(gray_image: np.ndarray) -> np.ndarray:
